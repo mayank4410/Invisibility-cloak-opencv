@@ -1,0 +1,71 @@
+import cv2
+import numpy as np
+import time
+
+def main():
+    # Open webcam
+    cap = cv2.VideoCapture(0)
+
+    # Let the camera warm up
+    print("Warming up camera... Please wait 3 seconds.")
+    time.sleep(3)
+
+    # Capture background (static scene without cloak)
+    print("Capturing background...")
+    for i in range(30):
+        ret, background = cap.read()
+    background = np.flip(background, axis=1)
+
+    print("Background captured successfully! Now wave your RED cloak 🎭")
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        # Flip frame for mirror view
+        frame = np.flip(frame, axis=1)
+
+        # Convert to HSV color space
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+        # Define red color range in HSV
+        # Red wraps around hue = 0, so two ranges are used
+        lower_red1 = np.array([0, 120, 70])
+        upper_red1 = np.array([10, 255, 255])
+        lower_red2 = np.array([170, 120, 70])
+        upper_red2 = np.array([180, 255, 255])
+
+        # Create masks for red
+        mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
+        mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
+        mask = mask1 + mask2
+
+        # Refining mask (remove noise)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_DILATE, np.ones((3, 3), np.uint8))
+
+        # Create inverse mask
+        mask_inv = cv2.bitwise_not(mask)
+
+        # Segment out the red part (cloak) from background
+        res1 = cv2.bitwise_and(background, background, mask=mask)
+
+        # Segment the rest of the frame
+        res2 = cv2.bitwise_and(frame, frame, mask=mask_inv)
+
+        # Combine results
+        final_output = cv2.addWeighted(res1, 1, res2, 1, 0)
+
+        # Show the output
+        cv2.imshow("Invisibility Cloak 🧙‍♂️", final_output)
+
+        # Exit on pressing 'q'
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    main()
